@@ -142,7 +142,7 @@ def analyze_dtpp_zips(folder, cifp_file, num_worker_processes=None) -> AnalysisR
     # Intentionally don't use a full cpu count worth of processes as this
     # actually seems to slow stuff down.
     if num_worker_processes is None:
-        num_worker_processes = (multiprocessing.cpu_count() // 2) + 1
+        num_worker_processes = (multiprocessing.cpu_count() // 2) + 2
 
     with multiprocessing.Pool(processes=num_worker_processes) as pool:
         # Set up a progress bar for counting as results come in...
@@ -193,6 +193,8 @@ def analyze_dtpp_zips(folder, cifp_file, num_worker_processes=None) -> AnalysisR
     # Merge data from the cifp dataset with the approach plates.
     airports = {}
     for airport, approaches in approaches_by_airport.items():
+        if airport not in cifp_airports:
+            continue
         cifp_airport = cifp_airports[airport]
         for plate_info, approach_name, file_name in approaches:
             cifp_airport.approaches.append(
