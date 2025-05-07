@@ -99,8 +99,8 @@ if __name__ == "__main__":
     latest_release = get_latest_release_number()
 
     # Set the release number as an output if we're running on CI.
-    if 'GITHUB_OUTPUT' in os.environ:
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+    if "GITHUB_OUTPUT" in os.environ:
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
             f.write(f"release={latest_release}\n")
 
     download_cifp_zip(latest_release, "download")

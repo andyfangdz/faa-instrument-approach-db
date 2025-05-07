@@ -17,7 +17,6 @@ if __name__ == "__main__":
         folder = "../../Downloads/faa_dttp/250320"
         cifp_file = "../../Downloads/faa_dttp/250320/FAACIFP18"
 
-
     results = scrape_faa_dtpp_zip.analyze_dtpp_zips(
         folder,
         cifp_file=cifp_file,
