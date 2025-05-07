@@ -1,0 +1,38 @@
+name: Scrape and Release
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3
+      uses: actions/setup-python@v3
+    - name: Install dependencies
+      run: |
+        pip install -r requirements_dev.txt
+        pip install -r scrape_faa/requirements.txt
+
+    - name: Scrape FAA data
+      id: scrape_faa
+      working-directory: scrape_faa
+      run: |
+        python download.py
+    - name: Extract CIFP file
+      working-directory: scrape_faa/download
+      run: |
+        7z x CIFP_*.zip
+    - name: Analyze Plates
+      run: |
+        python approach_plate_extract.py scrape_faa/download scrape_faa/download/FAACIFP18
+
+    - name: Create Release
+      run: |
+        gh release create ${{ steps.scrape_faa.outputs.release }} approaches.json
+      env:
+        GH_TOKEN: ${{ github.token }}

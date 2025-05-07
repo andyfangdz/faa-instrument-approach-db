@@ -1,5 +1,6 @@
 # Testing files
 output.json
+approaches.json
 
 test_data/d-tpp_Metafile.xml
 /lines.png
