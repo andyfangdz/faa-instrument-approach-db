@@ -20,8 +20,8 @@ approaches either. The master is encoded textually as part of Form 8260-x, e.g
 available to the public.
 
 CIFP and approach plates are likely derived from this. The Form 8260 is a truly
-cursed thing, you can view one here: https://www.faa.gov/aero_docs/acifp/2015121527331001001-SFO/CA_KSFO_ILS%20OR%20LOC%20RWY%2028LSAC2_A25A_F.PDF
-(Also present in test_data folder.)
+cursed thing, you can view one
+[here](https://github.com/ammaraskar/faa-instrument-approach-db/blob/master/test_data/8260%20ILS%20RWY%2028L%20SFO.pdf).
 
 ## Parsing Details
 
