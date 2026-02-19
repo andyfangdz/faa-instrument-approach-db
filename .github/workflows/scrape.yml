@@ -1,6 +1,15 @@
 name: Scrape and Release
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Skip AIRAC date check and scrape immediately'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   schedule:
     # Run on AIRAC effective dates at 12:00 UTC.
     # AIRAC cycles repeat every 28 days from epoch 2024-01-04.
@@ -19,7 +28,10 @@ jobs:
     - name: Check if today is an AIRAC effective date
       id: airac_check
       run: |
-        python3 -c "
+        if [ "${{ github.event.inputs.force }}" = "true" ]; then
+          echo "Force mode enabled, skipping AIRAC date check."
+        else
+          python3 -c "
         from datetime import datetime, timezone
         epoch = datetime(2024, 1, 4, tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
@@ -29,6 +41,7 @@ jobs:
         if not is_airac:
             exit(1)
         " || echo "skip=true" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Skip non-AIRAC days
       if: steps.airac_check.outputs.skip == 'true'
