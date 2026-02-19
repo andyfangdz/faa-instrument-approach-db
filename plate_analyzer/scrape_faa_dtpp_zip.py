@@ -62,7 +62,7 @@ def scan_dtpp_file(zip):
                     print("OCR needed")
 
 
-def analyze_dtpp_zips(folder, cifp_file, cifp_cycle="", num_worker_processes=None) -> AnalysisResult:
+def analyze_dtpp_zips(folder, cifp_file, num_worker_processes=None) -> AnalysisResult:
     """Given a folder containing the `DDTPPX_CYCLE.zip` files, analyzes all
     the approach plates inside. Combines with airport data from the
     `cifp` file to spit out a full analysis.
@@ -207,7 +207,6 @@ def analyze_dtpp_zips(folder, cifp_file, cifp_cycle="", num_worker_processes=Non
 
     return AnalysisResult(
         dtpp_cycle_number=dtpp_cycle,
-        cifp_cycle=cifp_cycle,
         airports=airports,
         failures=failures,
         skipped_approaches=skipped_approaches,

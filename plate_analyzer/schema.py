@@ -209,8 +209,6 @@ class SkippedApproach(BaseModel):
 class AnalysisResult(BaseModel):
     # Which dtpp cycle number was used in the analysis.
     dtpp_cycle_number: str
-    # Which CIFP cycle (from zip filename, e.g. "260219") was used.
-    cifp_cycle: str = ""
     airports: Dict[str, Airport]
     failures: List[Failure]
     skipped_approaches: List[SkippedApproach]
