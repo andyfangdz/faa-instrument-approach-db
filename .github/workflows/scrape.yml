@@ -1,6 +1,12 @@
 name: Scrape and Release
 on:
   workflow_dispatch:
+  schedule:
+    # Run on AIRAC effective dates at 12:00 UTC.
+    # AIRAC cycles repeat every 28 days from epoch 2024-01-04.
+    # Since cron can't express 28-day intervals, we run daily and
+    # let the job self-skip when it's not an AIRAC effective date.
+    - cron: "0 12 * * *"
 
 permissions:
   contents: write
@@ -10,30 +16,71 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Check if today is an AIRAC effective date
+      id: airac_check
+      run: |
+        python3 -c "
+        from datetime import datetime, timezone
+        epoch = datetime(2024, 1, 4, tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        days = (now - epoch).days
+        is_airac = (days % 28) == 0
+        print(f'Days since epoch: {days}, mod 28: {days % 28}, is_airac: {is_airac}')
+        if not is_airac:
+            exit(1)
+        " || echo "skip=true" >> "$GITHUB_OUTPUT"
+
+    - name: Skip non-AIRAC days
+      if: steps.airac_check.outputs.skip == 'true'
+      run: echo "Not an AIRAC effective date, skipping."
+
     - uses: actions/checkout@v3
+      if: steps.airac_check.outputs.skip != 'true'
+
     - name: Set up Python 3
+      if: steps.airac_check.outputs.skip != 'true'
       uses: actions/setup-python@v3
       with:
         python-version: "3.13"
+
     - name: Install dependencies
+      if: steps.airac_check.outputs.skip != 'true'
       run: |
         pip install -r requirements_dev.txt
         pip install -r scrape_faa/requirements.txt
 
     - name: Scrape FAA data
+      if: steps.airac_check.outputs.skip != 'true'
       id: scrape_faa
       working-directory: scrape_faa
       run: |
         python download.py
+
     - name: Extract CIFP file
+      if: steps.airac_check.outputs.skip != 'true'
       working-directory: scrape_faa/download
       run: |
         7z x CIFP_*.zip
+
     - name: Analyze Plates
+      if: steps.airac_check.outputs.skip != 'true'
       run: |
         python approach_plate_extract.py scrape_faa/download scrape_faa/download/FAACIFP18
 
+    - name: Check for existing release
+      if: steps.airac_check.outputs.skip != 'true'
+      id: release_check
+      run: |
+        RELEASE="${{ steps.scrape_faa.outputs.release }}"
+        if gh release view "$RELEASE" > /dev/null 2>&1; then
+          echo "Release $RELEASE already exists, skipping."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}
+
     - name: Create Release
+      if: steps.airac_check.outputs.skip != 'true' && steps.release_check.outputs.exists != 'true'
       run: |
         gh release create ${{ steps.scrape_faa.outputs.release }} approaches.json
       env:
