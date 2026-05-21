@@ -9,6 +9,17 @@ from datetime import datetime
 CIFP_URL = "https://aeronav.faa.gov/Upload_313-d/cifp/"
 DTPP_URL = "https://aeronav.faa.gov/upload_313-d/terminal/"
 CIFP_ZIP_PATTERN = re.compile(r"^CIFP_?(\d{6})\.zip$", re.IGNORECASE)
+REQUEST_TIMEOUT = (10, 60)
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024 * 8
+DOWNLOAD_PROGRESS_INTERVAL = 1024 * 1024 * 100
+
+
+def format_bytes(byte_count: int) -> str:
+    for unit in ["B", "KB", "MB"]:
+        if byte_count < 1024:
+            return f"{byte_count:.1f} {unit}"
+        byte_count /= 1024
+    return f"{byte_count:.1f} GB"
 
 
 def get_cifp_release_number(filename: str) -> str | None:
@@ -19,7 +30,7 @@ def get_cifp_release_number(filename: str) -> str | None:
 
 
 def get_cifp_zip_links():
-    response = requests.get(CIFP_URL, timeout=10)
+    response = requests.get(CIFP_URL, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -42,10 +53,10 @@ def get_cifp_zip_links():
 def get_latest_release_number() -> str:
     # Uses the CIFP url to get the latest d-TPP release number like
     # 250320, 250417, etc.
-    print(f"Fetching page: {CIFP_URL}")
+    print(f"Fetching page: {CIFP_URL}", flush=True)
     zip_links = get_cifp_zip_links()
-    print("Page retrieved successfully.")
-    print("Parsing HTML content...")
+    print("Page retrieved successfully.", flush=True)
+    print("Parsing HTML content...", flush=True)
 
     # Get the timestamp for each zip file and store them in a list
     zip_files_with_timestamps = []
@@ -60,9 +71,50 @@ def get_latest_release_number() -> str:
     zip_files_with_timestamps.sort(key=lambda x: x[2], reverse=True)
     latest_zip_file, latest_release_number, _ = zip_files_with_timestamps[0]
 
-    print(f"Latest CIFP file found: {latest_zip_file}")
+    print(f"Latest CIFP file found: {latest_zip_file}", flush=True)
     # Convert CIFP_250123.zip or CIFP250123.zip to 250123
     return latest_release_number
+
+
+def download_file(url: str, filename: str):
+    download_dir = os.path.dirname(filename)
+    if download_dir:
+        os.makedirs(download_dir, exist_ok=True)
+
+    print(f"Downloading {url}...", flush=True)
+    response = requests.get(url, stream=True, timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+
+    total_bytes = int(response.headers.get("Content-Length") or 0)
+    if total_bytes:
+        print(f"Expected size: {format_bytes(total_bytes)}", flush=True)
+
+    bytes_written = 0
+    next_progress = DOWNLOAD_PROGRESS_INTERVAL
+    with open(filename, "wb") as file:
+        for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+            if not chunk:
+                continue
+
+            file.write(chunk)
+            bytes_written += len(chunk)
+            if total_bytes and bytes_written >= next_progress:
+                percentage = (bytes_written / total_bytes) * 100
+                print(
+                    f"Downloaded {format_bytes(bytes_written)} of "
+                    f"{format_bytes(total_bytes)} ({percentage:.1f}%).",
+                    flush=True,
+                )
+                while next_progress <= bytes_written:
+                    next_progress += DOWNLOAD_PROGRESS_INTERVAL
+
+    if total_bytes and bytes_written != total_bytes:
+        raise RuntimeError(
+            f"Incomplete download for {url}: expected {total_bytes} bytes, "
+            f"received {bytes_written} bytes."
+        )
+
+    print(f"Downloaded: {filename} ({format_bytes(bytes_written)})", flush=True)
 
 
 def download_cifp_zip(release_number: str, download_folder: str):
@@ -79,27 +131,18 @@ def download_cifp_zip(release_number: str, download_folder: str):
         latest_zip_filename = f"CIFP_{release_number}.zip"
         latest_zip_link = urljoin(CIFP_URL, latest_zip_filename)
 
-    # Download the latest zip file
     filename = os.path.join(download_folder, latest_zip_filename)
-    os.makedirs(download_folder, exist_ok=True)
-
-    print(f"Downloading {latest_zip_link}...")
-    zip_response = requests.get(latest_zip_link, stream=True, timeout=10)
-    zip_response.raise_for_status()
-    with open(filename, "wb") as file:
-        for chunk in zip_response.iter_content(chunk_size=1024 * 20):
-            file.write(chunk)
-    print(f"Downloaded: {filename}")
+    download_file(latest_zip_link, filename)
 
 
 def download_dtpp_zips(release_number: str, download_folder: str):
-    print(f"Fetching page: {DTPP_URL}")
-    response = requests.get(DTPP_URL, timeout=10)
+    print(f"Fetching page: {DTPP_URL}", flush=True)
+    response = requests.get(DTPP_URL, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
-    print("Page retrieved successfully.")
+    print("Page retrieved successfully.", flush=True)
 
     soup = BeautifulSoup(response.text, "html.parser")
-    print("Parsing HTML content...")
+    print("Parsing HTML content...", flush=True)
 
     # Extract all .zip links involving the current release number
     zip_links = [
@@ -108,21 +151,17 @@ def download_dtpp_zips(release_number: str, download_folder: str):
         if link["href"].endswith(".zip") and release_number in link["href"]
     ]
 
-    for zip_url in zip_links:
-        print(f"Downloading: {zip_url}")
-        zip_response = requests.get(zip_url, stream=True, timeout=10)
-        zip_response.raise_for_status()
+    print(f"Found {len(zip_links)} d-TPP zip files for {release_number}.", flush=True)
 
+    for zip_url in zip_links:
         zip_name = os.path.join(download_folder, os.path.basename(zip_url))
-        with open(zip_name, "wb") as file:
-            for chunk in zip_response.iter_content(chunk_size=1024 * 20):
-                file.write(chunk)
+        download_file(zip_url, zip_name)
 
 
 # Function to get the timestamp of a file using the 'Last-Modified' header
 def get_file_timestamp(url):
     # Send a HEAD request to get the headers of the file
-    response = requests.head(url)
+    response = requests.head(url, timeout=REQUEST_TIMEOUT)
     return datetime.strptime(
         response.headers["Last-Modified"], "%a, %d %b %Y %H:%M:%S %Z"
     )

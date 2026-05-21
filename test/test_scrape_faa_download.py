@@ -4,9 +4,10 @@ from scrape_faa import download
 
 
 class FakeResponse:
-    def __init__(self, text="", content=b""):
+    def __init__(self, text="", content=b"", headers=None):
         self.text = text
         self.content = content
+        self.headers = headers or {}
 
     def raise_for_status(self):
         pass

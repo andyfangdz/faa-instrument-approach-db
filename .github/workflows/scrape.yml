@@ -67,13 +67,13 @@ jobs:
       id: scrape_faa
       working-directory: scrape_faa
       run: |
-        python download.py
+        python -u download.py
 
     - name: Extract CIFP file
       if: steps.airac_check.outputs.skip != 'true'
       working-directory: scrape_faa/download
       run: |
-        7z x CIFP_*.zip
+        7z x CIFP*.zip
 
     - name: Analyze Plates
       if: steps.airac_check.outputs.skip != 'true'
