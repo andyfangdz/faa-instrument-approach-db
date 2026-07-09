@@ -258,9 +258,10 @@ def get_i_beam_from_line(line):
 
 def line_distance_to_point(line, point):
     """Calculate perpendicular from a tuple of points defining `line` and `point`"""
-    return np.linalg.norm(
-        np.cross(line[0] - line[1], line[1] - point)
-    ) / np.linalg.norm(line[1] - line[0])
+    line_vector = line[0] - line[1]
+    point_vector = line[1] - point
+    area = abs((line_vector[0] * point_vector[1]) - (line_vector[1] * point_vector[0]))
+    return area / np.linalg.norm(line[1] - line[0])
 
 
 def unit_vector(vector):

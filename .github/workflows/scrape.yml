@@ -12,7 +12,7 @@ on:
           - 'true'
   schedule:
     # Run on AIRAC effective dates at 12:00 UTC.
-    # AIRAC cycles repeat every 28 days from epoch 2024-01-04.
+    # AIRAC cycles repeat every 28 days from the 2024 cycle 2401 effective date.
     # Since cron can't express 28-day intervals, we run daily and
     # let the job self-skip when it's not an AIRAC effective date.
     - cron: "0 12 * * *"
@@ -33,7 +33,7 @@ jobs:
         else
           python3 -c "
         from datetime import datetime, timezone
-        epoch = datetime(2024, 1, 4, tzinfo=timezone.utc)
+        epoch = datetime(2024, 1, 25, tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
         days = (now - epoch).days
         is_airac = (days % 28) == 0
