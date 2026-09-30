@@ -11,90 +11,79 @@ on:
           - 'false'
           - 'true'
   schedule:
-    # Run on AIRAC effective dates at 12:00 UTC.
-    # AIRAC cycles repeat every 28 days from the 2024 cycle 2401 effective date.
-    # Since cron can't express 28-day intervals, we run daily and
-    # let the job self-skip when it's not an AIRAC effective date.
+    # AIRAC cycles repeat every 28 days from January 25, 2024.
+    # Cron cannot express this interval, so check the calendar daily.
     - cron: "0 12 * * *"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  scrape:
+  check_airac:
+    name: Check AIRAC schedule
     runs-on: ubuntu-latest
-
+    outputs:
+      should_run: ${{ steps.airac_check.outputs.should_run }}
     steps:
+    - uses: actions/checkout@v7
     - name: Check if today is an AIRAC effective date
       id: airac_check
-      run: |
-        if [ "${{ github.event.inputs.force }}" = "true" ]; then
-          echo "Force mode enabled, skipping AIRAC date check."
-        else
-          python3 -c "
-        from datetime import datetime, timezone
-        epoch = datetime(2024, 1, 25, tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
-        days = (now - epoch).days
-        is_airac = (days % 28) == 0
-        print(f'Days since epoch: {days}, mod 28: {days % 28}, is_airac: {is_airac}')
-        if not is_airac:
-            exit(1)
-        " || echo "skip=true" >> "$GITHUB_OUTPUT"
-        fi
+      env:
+        FORCE: ${{ inputs.force || 'false' }}
+      run: python3 scripts/check_airac.py --force "$FORCE"
 
-    - name: Skip non-AIRAC days
-      if: steps.airac_check.outputs.skip == 'true'
-      run: echo "Not an AIRAC effective date, skipping."
+  scrape:
+    name: Scrape and publish data
+    needs: check_airac
+    if: needs.check_airac.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
+    steps:
     - uses: actions/checkout@v7
-      if: steps.airac_check.outputs.skip != 'true'
 
-    - name: Set up Python 3
-      if: steps.airac_check.outputs.skip != 'true'
+    - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: "3.13"
+        python-version-file: ".python-version"
 
     - name: Install dependencies
-      if: steps.airac_check.outputs.skip != 'true'
       run: |
-        pip install -r requirements_dev.txt
-        pip install -r scrape_faa/requirements.txt
+        python -m pip install --only-binary=pymupdf,pymupdfb -r requirements_dev.txt
 
     - name: Scrape FAA data
-      if: steps.airac_check.outputs.skip != 'true'
       id: scrape_faa
       working-directory: scrape_faa
       run: |
         python -u download.py
 
     - name: Extract CIFP file
-      if: steps.airac_check.outputs.skip != 'true'
       working-directory: scrape_faa/download
       run: |
         7z x CIFP*.zip
 
     - name: Analyze Plates
-      if: steps.airac_check.outputs.skip != 'true'
       run: |
         python approach_plate_extract.py scrape_faa/download scrape_faa/download/FAACIFP18
 
     - name: Check for existing release
-      if: steps.airac_check.outputs.skip != 'true'
       id: release_check
       run: |
-        RELEASE="${{ steps.scrape_faa.outputs.release }}"
         if gh release view "$RELEASE" > /dev/null 2>&1; then
           echo "Release $RELEASE already exists, skipping."
           echo "exists=true" >> "$GITHUB_OUTPUT"
+          echo "Release $RELEASE already exists; no new data was published." >> "$GITHUB_STEP_SUMMARY"
         fi
       env:
+        RELEASE: ${{ steps.scrape_faa.outputs.release }}
         GH_TOKEN: ${{ github.token }}
 
     - name: Create Release
-      if: steps.airac_check.outputs.skip != 'true' && steps.release_check.outputs.exists != 'true'
+      if: steps.release_check.outputs.exists != 'true'
       run: |
-        gh release create ${{ steps.scrape_faa.outputs.release }} approaches.json
+        gh release create "$RELEASE" approaches.json
+        echo "Published approaches.json for cycle $RELEASE." >> "$GITHUB_STEP_SUMMARY"
       env:
+        RELEASE: ${{ steps.scrape_faa.outputs.release }}
         GH_TOKEN: ${{ github.token }}

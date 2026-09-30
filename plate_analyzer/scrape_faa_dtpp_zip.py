@@ -152,9 +152,9 @@ def analyze_dtpp_zips(folder, cifp_file, num_worker_processes=None) -> AnalysisR
                 process_single_dtpp_pdf, pdf_processing_futures_iterator()
             ):
                 pbar.update(1)
+                airport, approach = approach_file_to_airport[file]
 
                 if exception_message is None:
-                    airport, approach = approach_file_to_airport[file]
                     approaches_by_airport[airport].append(
                         (approach_info, approach, file)
                     )
