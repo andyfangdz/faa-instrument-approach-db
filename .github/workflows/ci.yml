@@ -16,13 +16,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Set up Python 3
+    - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: "3.13"
+        python-version-file: ".python-version"
     - name: Install dependencies
       run: |
-        pip install -r requirements_dev.txt
+        python -m pip install --only-binary=pymupdf,pymupdfb -r requirements_dev.txt
     - name: Check Formatting
       run: |
         black . --check 

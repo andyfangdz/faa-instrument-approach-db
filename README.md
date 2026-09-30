@@ -45,7 +45,32 @@ cursed thing, you can view one
 
 ## Development
 
-Run tests with `python -m pytest`
+Use Python 3.12 (see `.python-version`). PyMuPDF 1.24.9 has a prebuilt wheel
+for this Python version; Python 3.13 falls back to an incompatible source build.
+CI and the publisher use the same version file and require PyMuPDF wheels so
+an unsupported interpreter fails promptly instead of compiling MuPDF.
+
+```sh
+python -m pip install --only-binary=pymupdf,pymupdfb -r requirements_dev.txt
+python -m black . --check
+python -m pytest
+```
+
+## Publishing
+
+The daily workflow checks the 28-day AIRAC calendar in UTC. On off-cycle days,
+**Scrape and publish data** is marked skipped and the schedule job summary says
+that no data was published. A green calendar check is not proof of fresh data;
+check the latest release tag and its `approaches.json` asset.
+
+After reviewing and merging a publisher repair, a maintainer can use
+**Actions → Scrape and Release → Run workflow**, select the repaired branch,
+and set **force** to `true` to recover a missed run. This runs the actual FAA
+download/extraction and publishes the latest FAA-selected cycle if its release
+does not already exist. It can publish data immediately, even off-cycle, so
+only dispatch it when release publication is intended. Existing releases and
+assets are left untouched. Check the published cycle against the intended FAA
+cycle; the manual override does not select a historical cycle.
 
 ### Notes:
 
